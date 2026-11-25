@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: claude-router
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+    # Shell completions ship in every archive.
+    - rm -rf completions
+    - mkdir completions
+    - sh -c "go run ./cmd/claude-router completion bash > completions/claude-router.bash"
+    - sh -c "go run ./cmd/claude-router completion zsh > completions/_claude-router"
+    - sh -c "go run ./cmd/claude-router completion fish > completions/claude-router.fish"
+
+builds:
+  - id: claude-router
+    main: ./cmd/claude-router
+    binary: claude-router
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+universal_binaries:
+  - id: claude-router
+    replace: true
+
+archives:
+  - id: claude-router
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ if eq .Arch "all" }}universal{{ else }}{{ .Arch }}{{ end }}
+    files: [README.md, LICENSE, completions/*]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:", "^ci:"]
+
+release:
+  footer: |
+    **Install:** `brew install trevin-lee/tap/claude-router`, `go install github.com/trevin-lee/claude-router/cmd/claude-router@{{ .Tag }}`, or download a binary below.
