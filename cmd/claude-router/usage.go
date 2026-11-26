@@ -102,19 +102,19 @@ func (c *config) readAccount(ctx context.Context, id string) error {
 }
 
 // runUsage runs `claude -p /usage` under dir. It spends no tokens. It runs from an
-// empty folder so no project settings, hooks or CLAUDE.md load, with no MCP servers
-// and no saved transcript.
+// empty folder of its own, the same every time so no new project is recorded per
+// read, loading no user or project settings (so no hooks or plugins), no MCP
+// servers, and saving no transcript.
 func (c *config) runUsage(ctx context.Context, bin, dir string) (string, error) {
-	work, err := os.MkdirTemp("", "claude-router-")
-	if err != nil {
+	work := filepath.Join(c.cacheDir, "probe")
+	if err := os.MkdirAll(work, 0o700); err != nil {
 		return "", err
 	}
-	defer os.RemoveAll(work)
-
 	uctx, cancel := context.WithTimeout(ctx, c.usageWait)
 	defer cancel()
 	cmd := exec.CommandContext(uctx, bin, "-p", "/usage", "--output-format", "json",
-		"--no-session-persistence", "--strict-mcp-config", "--mcp-config", `{"mcpServers":{}}`)
+		"--no-session-persistence", "--setting-sources", "project",
+		"--strict-mcp-config", "--mcp-config", `{"mcpServers":{}}`)
 	cmd.Dir = work
 	cmd.Env = envWith(dir)
 	out, err := cmd.Output()

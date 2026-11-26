@@ -200,12 +200,12 @@ func TestStatusLive(t *testing.T) {
 	)
 	lacks(t, "status", out, "97%")
 
-	// /usage ran from an empty temporary folder with no MCP servers or transcript.
+	// /usage ran from its own folder with no settings, MCP servers or transcript.
 	calls, err := os.ReadFile(filepath.Join(h.dir("0"), "calls.log"))
 	must(t, err)
 	wd, _ := os.Getwd()
 	lacks(t, "calls", string(calls), wd+"|-p")
-	contains(t, "calls", string(calls), "|-p /usage --output-format json --no-session-persistence --strict-mcp-config --mcp-config {\"mcpServers\":{}}")
+	contains(t, "calls", string(calls), "/cache/probe|-p /usage --output-format json --no-session-persistence --setting-sources project --strict-mcp-config --mcp-config {\"mcpServers\":{}}")
 }
 
 func TestStatusJSONAndSuggest(t *testing.T) {
