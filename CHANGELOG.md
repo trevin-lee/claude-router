@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 - 2026-11-25
+
+Several accounts now work as one.
+
+- `launch` starts Claude Code on the account with the most room left, deciding instantly from the usage Claude Code records, and refreshes old readings in the background. Point a `claude` shell function or the VS Code process wrapper at it.
+- Every account shares one setup with `~/.claude`: settings, skills, plugins, hooks, conversation history and memory are linked, and MCP servers, trusted folders and preferences are synced, so a change under any account reaches all of them. `setup` does this for every account; `login`, `use` and `launch` do it for theirs.
+- `status` marks the account the next session will start on, and uses Claude Code's own usage record when it is newer.
+- Fixed: a `claude` started from inside a Claude Code session used that session's login instead of the account's, so `status` and `use` could report or run the wrong account.
+- Fixed: every usage read left an empty project behind in the account folder. Live reads now run from one folder of their own without loading settings, hooks or plugins, and the leftovers are removed.
+
 ## 0.1.0 - 2026-11-25
 
 First release.

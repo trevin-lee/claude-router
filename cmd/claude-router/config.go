@@ -8,37 +8,47 @@ import (
 	"time"
 )
 
-// Readings older than this are never shown as current or used to pick an account.
+// Readings older than this are never shown as current or used by suggest.
 const freshFor = 2 * time.Hour
 
 type config struct {
-	accounts  []string // account numbers, in order
-	dirPrefix string   // account n lives in dirPrefix + n
-	cacheDir  string
-	claudeBin string // empty: look up "claude" on PATH
-	authWait  time.Duration
-	usageWait time.Duration
-	now       func() time.Time
+	accounts   []string // account numbers, in order
+	dirPrefix  string   // account n lives in dirPrefix + n
+	home       string   // the shared Claude Code folder every account links to (~/.claude)
+	homeJSON   string   // its .claude.json (~/.claude.json for the default folder)
+	cacheDir   string
+	claudeBin  string // empty: look up "claude" on PATH
+	authWait   time.Duration
+	usageWait  time.Duration
+	background bool // launch may start a background usage refresh
+	now        func() time.Time
 }
 
 func loadConfig() (*config, error) {
-	home, err := os.UserHomeDir()
+	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("finding home folder: %w", err)
 	}
 	c := &config{
-		accounts:  []string{"0", "1", "2"},
-		dirPrefix: filepath.Join(home, ".claude-"),
-		claudeBin: os.Getenv("CLAUDE_BIN"),
-		authWait:  30 * time.Second,
-		usageWait: 90 * time.Second,
-		now:       time.Now,
+		accounts:   []string{"0", "1", "2"},
+		dirPrefix:  filepath.Join(userHome, ".claude-"),
+		home:       filepath.Join(userHome, ".claude"),
+		homeJSON:   filepath.Join(userHome, ".claude.json"),
+		claudeBin:  os.Getenv("CLAUDE_BIN"),
+		authWait:   30 * time.Second,
+		usageWait:  90 * time.Second,
+		background: os.Getenv("CLAUDE_ROUTER_BACKGROUND_REFRESH") != "0",
+		now:        time.Now,
 	}
 	if v := os.Getenv("CLAUDE_ROUTER_ACCOUNTS"); strings.TrimSpace(v) != "" {
 		c.accounts = strings.FieldsFunc(v, func(r rune) bool { return r == ' ' || r == ',' })
 	}
 	if v := os.Getenv("CLAUDE_ROUTER_DIR_PREFIX"); v != "" {
 		c.dirPrefix = v
+	}
+	if v := os.Getenv("CLAUDE_ROUTER_HOME"); v != "" {
+		c.home = v
+		c.homeJSON = filepath.Join(v, ".claude.json")
 	}
 	if v := os.Getenv("CLAUDE_ROUTER_CACHE"); v != "" {
 		c.cacheDir = v
@@ -94,7 +104,8 @@ var parentSessionVars = []string{
 }
 
 // envWith returns the current environment for a claude run under dir: without any
-// parent-session variables, and with CLAUDE_CONFIG_DIR set to dir.
+// parent-session variables, and with CLAUDE_CONFIG_DIR set to dir (or unset, if dir
+// is empty).
 func envWith(dir string) []string {
 	drop := append([]string{"CLAUDE_CONFIG_DIR"}, parentSessionVars...)
 	env := os.Environ()
@@ -108,5 +119,8 @@ outer:
 		}
 		out = append(out, kv)
 	}
-	return append(out, "CLAUDE_CONFIG_DIR="+dir)
+	if dir != "" {
+		out = append(out, "CLAUDE_CONFIG_DIR="+dir)
+	}
+	return out
 }

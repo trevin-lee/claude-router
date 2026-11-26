@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime/debug"
 	"sort"
@@ -54,27 +55,34 @@ func main() {
 }
 
 func helpText(c *config) string {
-	return fmt.Sprintf(`claude-router %s: several Claude accounts signed in at once.
+	return fmt.Sprintf(`claude-router %[1]s: several Claude accounts signed in at once.
 
 Usage:
-  claude-router login <n>            Sign account <n> in (once per account)
+  claude-router login <n>            Sign account <n> in (once per account), then share setup
   claude-router use <n> [args...]    Start Claude Code as account <n> ("best": most room left)
-  claude-router env <n>              Print the export line, for: eval "$(claude-router env <n>)"
+  claude-router launch <claude> [args...]
+                                     Start claude on the account with the most room (for wrappers)
+  claude-router setup                Link every account to %[4]s and sync shared settings
   claude-router status [--cached] [--json]
                                      Each account's sign-in and usage, read live
   claude-router suggest [--cached]   Print the account number with the most room left
+  claude-router env <n>              Print the export line, for: eval "$(claude-router env <n>)"
   claude-router list                 Accounts and their config folders
   claude-router completion bash|zsh|fish
 
-<n> is one of: %s (also accepted as claude<n>). --cached skips the live read
-(about 15 s) and uses readings under %d minutes old.
+<n> is one of: %[2]s (also accepted as claude<n>). --cached skips the live read
+(about 10 s) and uses readings under %[3]d minutes old.
+
+Every account shares one setup: settings, skills, plugins, MCP servers, trusted
+folders, conversation history and memory live in %[4]s. Logins stay separate.
 
 Settings (environment):
   CLAUDE_ROUTER_ACCOUNTS    account numbers (default "0 1 2")
   CLAUDE_ROUTER_DIR_PREFIX  folder prefix (default ~/.claude-)
-  CLAUDE_ROUTER_CACHE       where readings are kept (default %s)
+  CLAUDE_ROUTER_HOME        the shared folder (default ~/.claude)
+  CLAUDE_ROUTER_CACHE       readings and log (default %[5]s)
   CLAUDE_BIN                claude binary (default: claude on PATH)
-`, buildVersion(), strings.Join(c.accounts, " "), int(freshFor/time.Minute), c.cacheDir)
+`, buildVersion(), strings.Join(c.accounts, " "), int(freshFor/time.Minute), c.home, c.cacheDir)
 }
 
 func run(ctx context.Context, c *config, args []string, stdout, stderr io.Writer) error {
@@ -87,6 +95,12 @@ func run(ctx context.Context, c *config, args []string, stdout, stderr io.Writer
 		return c.cmdLogin(rest, stderr)
 	case "use":
 		return c.cmdUse(ctx, rest, stderr)
+	case "launch":
+		return c.cmdLaunch(rest)
+	case "setup":
+		return c.cmdSetup(stdout)
+	case "refresh": // used in the background by launch
+		return c.cmdRefresh(ctx)
 	case "env":
 		return c.cmdEnv(rest, stdout)
 	case "status":
@@ -140,7 +154,21 @@ func (c *config) cmdLogin(args []string, stderr io.Writer) error {
 		return err
 	}
 	fmt.Fprintf(stderr, "Signing in claude%s (folder %s). Use the account you want as claude%s.\n", id, dir, id)
-	return execClaude(bin, []string{"auth", "login"}, dir)
+	cmd := exec.Command(bin, "auth", "login")
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	cmd.Env = envWith(dir)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("sign-in did not finish: %w", err)
+	}
+	notes, err := c.prepare(id)
+	for _, n := range notes {
+		fmt.Fprintf(stderr, "claude%s: %s\n", id, n)
+	}
+	if err != nil {
+		return fmt.Errorf("signed in, but sharing the setup failed: %w", err)
+	}
+	fmt.Fprintf(stderr, "claude%s is signed in and shares the setup in %s.\n", id, c.home)
+	return nil
 }
 
 func (c *config) cmdUse(ctx context.Context, args []string, stderr io.Writer) error {
@@ -165,6 +193,9 @@ func (c *config) cmdUse(ctx context.Context, args []string, stderr io.Writer) er
 	bin, err := c.claude()
 	if err != nil {
 		return err
+	}
+	if _, err := c.prepare(id); err != nil {
+		fmt.Fprintf(stderr, "claude-router: warning: claude%s may not share the full setup: %v\n", id, err)
 	}
 	return execClaude(bin, args[1:], dir)
 }
@@ -230,8 +261,13 @@ func (c *config) cmdStatus(ctx context.Context, args []string, stdout, stderr io
 		enc.SetIndent("", "  ")
 		return enc.Encode(views)
 	}
+	next, haveNext := c.pick(views)
 	for _, v := range views {
-		fmt.Fprintln(stdout, statusLine(v))
+		line := statusLine(v)
+		if haveNext && v.Account == next.Account {
+			line += "  <- next session"
+		}
+		fmt.Fprintln(stdout, line)
 	}
 	return nil
 }
@@ -276,9 +312,9 @@ func statusLine(v view) string {
 	case v.State == "unread":
 		return head + "not read yet: run  claude-router status"
 	case v.Fresh:
-		body = fmt.Sprintf("%s  %s  [read %s]", who, describeLimits(v.Limits), ago(v.ageDuration))
+		body = fmt.Sprintf("%s  %s  [read %s]", who, describeLimits(v.Limits), ago(v.age))
 	default:
-		body = fmt.Sprintf("%s  STALE, not current: last read %s showed %s", who, ago(v.ageDuration), describeLimits(v.Limits))
+		body = fmt.Sprintf("%s  STALE, not current: last read %s showed %s", who, ago(v.age), describeLimits(v.Limits))
 	}
 	if v.LatestRead != nil {
 		body += "  (latest read failed)"

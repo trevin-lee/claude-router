@@ -20,9 +20,9 @@ Last 24h · 120 requests · 3 sessions
 func TestParseUsage(t *testing.T) {
 	got := parseUsage(sampleUsage)
 	want := []Limit{
-		{"Current session", 80, "3pm (Europe/London)"},
-		{"Current week (all models)", 40, "Nov 30 at 9am (Europe/London)"},
-		{"Current week (Sonnet only)", 5, "Nov 30 at 9am (Europe/London)"},
+		{Label: "Current session", Used: 80, Resets: "3pm (Europe/London)"},
+		{Label: "Current week (all models)", Used: 40, Resets: "Nov 30 at 9am (Europe/London)"},
+		{Label: "Current week (Sonnet only)", Used: 5, Resets: "Nov 30 at 9am (Europe/London)"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("parseUsage:\n got %+v\nwant %+v", got, want)
@@ -31,7 +31,7 @@ func TestParseUsage(t *testing.T) {
 
 func TestParseUsageNoResetAndCRLF(t *testing.T) {
 	got := parseUsage("Current week (all models): 100% used\r\n")
-	want := []Limit{{"Current week (all models)", 100, ""}}
+	want := []Limit{{Label: "Current week (all models)", Used: 100, Resets: ""}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v want %+v", got, want)
 	}
@@ -50,14 +50,14 @@ func TestRoom(t *testing.T) {
 		want   *int
 	}{
 		{"session and week: the higher counts", parseUsage(sampleUsage), ptr(20)},
-		{"week only", []Limit{{"Current week (all models)", 60, ""}}, ptr(40)},
-		{"sonnet ignored when main limits exist", []Limit{{"Current week (all models)", 10, ""}, {"Current week (Sonnet only)", 90, ""}}, ptr(90)},
-		{"falls back to any limit", []Limit{{"Current week (Opus only)", 70, ""}}, ptr(30)},
-		{"over 100 floors at 0", []Limit{{"Current session", 120, ""}}, ptr(0)},
+		{"week only", []Limit{{Label: "Current week (all models)", Used: 60, Resets: ""}}, ptr(40)},
+		{"sonnet ignored when main limits exist", []Limit{{Label: "Current week (all models)", Used: 10, Resets: ""}, {Label: "Current week (Sonnet only)", Used: 90, Resets: ""}}, ptr(90)},
+		{"falls back to any limit", []Limit{{Label: "Current week (Opus only)", Used: 70, Resets: ""}}, ptr(30)},
+		{"over 100 floors at 0", []Limit{{Label: "Current session", Used: 120, Resets: ""}}, ptr(0)},
 		{"nothing reported", nil, nil},
 	}
 	for _, tc := range cases {
-		got := room(tc.limits)
+		got := room(tc.limits, time.Now())
 		if (got == nil) != (tc.want == nil) || (got != nil && *got != *tc.want) {
 			t.Errorf("%s: got %v want %v", tc.name, deref(got), deref(tc.want))
 		}

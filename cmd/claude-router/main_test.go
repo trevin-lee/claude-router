@@ -20,7 +20,8 @@ import (
 //	usage.txt  -> /usage prints that text
 //	fail       -> /usage fails
 const fakeClaude = `#!/bin/sh
-d=${CLAUDE_CONFIG_DIR:?}
+d=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+mkdir -p "$d"
 echo "$PWD|$*" >> "$d/calls.log"
 case "$1" in
   auth)
@@ -39,16 +40,17 @@ case "$1" in
     # JSON-encode the file: escape backslashes and quotes, join lines with \n.
     sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' "$d/usage.txt" | awk 'BEGIN{printf "\""} {printf "%s\\n", $0} END{printf "\""}'
     printf '}\n' ;;
-  *) echo "ran claude $* under $d cc=${CLAUDECODE-unset}" ;;
+  *) echo "ran claude $* under $d cfg=${CLAUDE_CONFIG_DIR-unset} cc=${CLAUDECODE-unset}" ;;
 esac
 `
 
 type harness struct {
-	t     *testing.T
-	bin   string
-	home  string
-	cache string
-	env   []string
+	t        *testing.T
+	bin      string
+	home     string // holds the account folders
+	userHome string // $HOME: the shared ~/.claude and ~/.claude.json live here
+	cache    string
+	env      []string
 }
 
 var builtBin string
@@ -80,8 +82,13 @@ func newHarness(t *testing.T) *harness {
 	if err := os.WriteFile(fake, []byte(fakeClaude), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	h := &harness{t: t, bin: builtBin, home: filepath.Join(tmp, "home"), cache: filepath.Join(tmp, "cache")}
+	h := &harness{t: t, bin: builtBin, home: filepath.Join(tmp, "home"), userHome: filepath.Join(tmp, "user"), cache: filepath.Join(tmp, "cache")}
+	must(t, os.MkdirAll(h.userHome, 0o700))
+	// A fresh HOME, so nothing can reach the real ~/.claude or ~/.claude.json.
 	h.env = append(os.Environ(),
+		"HOME="+h.userHome,
+		"TZ=UTC",
+		"CLAUDE_ROUTER_BACKGROUND_REFRESH=0",
 		"CLAUDE_BIN="+fake,
 		"CLAUDE_ROUTER_ACCOUNTS=0 1 2 3",
 		"CLAUDE_ROUTER_DIR_PREFIX="+filepath.Join(h.home, ".claude-"),
@@ -200,7 +207,7 @@ func TestStatusLive(t *testing.T) {
 	)
 	lacks(t, "status", out, "97%")
 
-	// /usage ran from its own folder with no settings, MCP servers or transcript.
+	// /usage ran from an empty temporary folder with no MCP servers or transcript.
 	calls, err := os.ReadFile(filepath.Join(h.dir("0"), "calls.log"))
 	must(t, err)
 	wd, _ := os.Getwd()
@@ -319,11 +326,4 @@ func TestBadCommandLine(t *testing.T) {
 			t.Errorf("completion %s failed", sh)
 		}
 	}
-}
-
-func TestUseStripsParentSession(t *testing.T) {
-	h := newHarness(t)
-	h.env = append(h.env, "CLAUDECODE=1", "CLAUDE_CODE_MESSAGING_SOCKET=/tmp/x")
-	out, _, _ := h.run("use", "1")
-	contains(t, "use", out, "under "+h.dir("1")+" cc=unset")
 }

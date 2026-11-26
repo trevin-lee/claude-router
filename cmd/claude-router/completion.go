@@ -10,7 +10,7 @@ const bashCompletion = `# bash completion for claude-router
 _claude_router() {
   local cur=${COMP_WORDS[COMP_CWORD]}
   if [ "$COMP_CWORD" -eq 1 ]; then
-    COMPREPLY=($(compgen -W "login use env status suggest list completion help version" -- "$cur"))
+    COMPREPLY=($(compgen -W "login use launch setup env status suggest list completion help version" -- "$cur"))
     return
   fi
   case ${COMP_WORDS[1]} in
@@ -31,6 +31,7 @@ _claude_router() {
   if (( CURRENT == 2 )); then
     _values 'command' \
       'login[sign an account in]' 'use[start Claude Code as an account]' \
+      'launch[start claude on the account with the most room]' 'setup[share one setup across accounts]' \
       'env[print the export line]' 'status[sign-in and usage of each account]' \
       'suggest[account with the most room left]' 'list[accounts and folders]' \
       'completion[shell completion script]' 'help[show help]' 'version[show version]'
@@ -55,6 +56,8 @@ end
 complete -c claude-router -f
 complete -c claude-router -n __fish_use_subcommand -a login -d 'Sign an account in'
 complete -c claude-router -n __fish_use_subcommand -a use -d 'Start Claude Code as an account'
+complete -c claude-router -n __fish_use_subcommand -a launch -d 'Start claude on the account with the most room'
+complete -c claude-router -n __fish_use_subcommand -a setup -d 'Share one setup across accounts'
 complete -c claude-router -n __fish_use_subcommand -a env -d 'Print the export line'
 complete -c claude-router -n __fish_use_subcommand -a status -d 'Sign-in and usage of each account'
 complete -c claude-router -n __fish_use_subcommand -a suggest -d 'Account with the most room left'

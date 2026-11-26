@@ -16,3 +16,9 @@ func execClaude(bin string, args []string, dir string) error {
 	argv := append([]string{filepath.Base(bin)}, args...)
 	return syscall.Exec(bin, argv, envWith(dir))
 }
+
+// startDetached starts cmd in its own session, so it outlives this process.
+func startDetached(cmd *exec.Cmd) error {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	return cmd.Start()
+}

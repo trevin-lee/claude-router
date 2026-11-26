@@ -27,3 +27,6 @@ func execClaude(bin string, args []string, dir string) error {
 	os.Exit(0)
 	return nil
 }
+
+// startDetached starts cmd without waiting for it.
+func startDetached(cmd *exec.Cmd) error { return cmd.Start() }
