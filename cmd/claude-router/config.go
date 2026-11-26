@@ -80,14 +80,33 @@ func (c *config) claude() (string, error) {
 	return path, nil
 }
 
-// envWith returns the current environment with CLAUDE_CONFIG_DIR set to dir.
+// parentSessionVars are set by a running Claude Code session for the processes it
+// starts. A claude started with them attaches to that session and uses its login
+// instead of the one in CLAUDE_CONFIG_DIR, so they are always removed.
+var parentSessionVars = []string{
+	"CLAUDECODE",
+	"CLAUDE_CODE_CHILD_SESSION",
+	"CLAUDE_CODE_CHILD_NOTES_DIR",
+	"CLAUDE_CODE_MESSAGING_SOCKET",
+	"CLAUDE_CODE_MESSAGING_TOKEN",
+	"CLAUDE_CODE_SESSION_ID",
+	"CLAUDE_PID",
+}
+
+// envWith returns the current environment for a claude run under dir: without any
+// parent-session variables, and with CLAUDE_CONFIG_DIR set to dir.
 func envWith(dir string) []string {
+	drop := append([]string{"CLAUDE_CONFIG_DIR"}, parentSessionVars...)
 	env := os.Environ()
 	out := make([]string, 0, len(env)+1)
+outer:
 	for _, kv := range env {
-		if !strings.HasPrefix(kv, "CLAUDE_CONFIG_DIR=") {
-			out = append(out, kv)
+		for _, name := range drop {
+			if strings.HasPrefix(kv, name+"=") {
+				continue outer
+			}
 		}
+		out = append(out, kv)
 	}
 	return append(out, "CLAUDE_CONFIG_DIR="+dir)
 }

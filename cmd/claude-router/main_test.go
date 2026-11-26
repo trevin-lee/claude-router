@@ -39,7 +39,7 @@ case "$1" in
     # JSON-encode the file: escape backslashes and quotes, join lines with \n.
     sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' "$d/usage.txt" | awk 'BEGIN{printf "\""} {printf "%s\\n", $0} END{printf "\""}'
     printf '}\n' ;;
-  *) echo "ran claude $* under $d" ;;
+  *) echo "ran claude $* under $d cc=${CLAUDECODE-unset}" ;;
 esac
 `
 
@@ -319,4 +319,11 @@ func TestBadCommandLine(t *testing.T) {
 			t.Errorf("completion %s failed", sh)
 		}
 	}
+}
+
+func TestUseStripsParentSession(t *testing.T) {
+	h := newHarness(t)
+	h.env = append(h.env, "CLAUDECODE=1", "CLAUDE_CODE_MESSAGING_SOCKET=/tmp/x")
+	out, _, _ := h.run("use", "1")
+	contains(t, "use", out, "under "+h.dir("1")+" cc=unset")
 }
