@@ -6,7 +6,7 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-version="${1:-$(git -C "$here" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')}"
+version="${1:-$( (git -C "$here" describe --tags --abbrev=0 2>/dev/null || true) | sed 's/^v//')}"
 version="${version:-0.0.0}"
 app="$here/build/Claude Router.app"
 
