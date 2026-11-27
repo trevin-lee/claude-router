@@ -227,6 +227,9 @@ func TestStatusJSONAndSuggest(t *testing.T) {
 	if views[2].State != "missing" || views[3].State != "signed_out" || views[2].Room != nil {
 		t.Errorf("unexpected states: %s", out)
 	}
+	if views[0].Next || !views[1].Next || views[2].Next || views[3].Next {
+		t.Errorf("next session should be account 1 alone: %s", out)
+	}
 
 	out, _, code := h.run("suggest", "--cached")
 	if code != 0 || out != "1\n" {

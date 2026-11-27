@@ -256,15 +256,19 @@ func (c *config) cmdStatus(ctx context.Context, args []string, stdout, stderr io
 		return err
 	}
 	views := c.views()
+	if next, ok := c.pick(views); ok {
+		for i := range views {
+			views[i].Next = views[i].Account == next.Account
+		}
+	}
 	if flags["--json"] {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(views)
 	}
-	next, haveNext := c.pick(views)
 	for _, v := range views {
 		line := statusLine(v)
-		if haveNext && v.Account == next.Account {
+		if v.Next {
 			line += "  <- next session"
 		}
 		fmt.Fprintln(stdout, line)

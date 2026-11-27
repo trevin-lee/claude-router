@@ -273,6 +273,7 @@ type view struct {
 	Fresh      bool        `json:"fresh"`
 	Room       *int        `json:"room"` // percent left; null unless fresh and known
 	LatestRead *failedRead `json:"latest_read_failed,omitempty"`
+	Next       bool        `json:"next"` // the account the next launched session starts on
 
 	age      time.Duration
 	signedIn bool // as far as the account's own files say (no claude call)
