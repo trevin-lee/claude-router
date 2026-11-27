@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 - 2026-11-27
+
+- A menu bar app for macOS, Claude Router (build it from source with `macos/build-app.sh`): shows the account new sessions will start on and its room left in the menu bar, and opens to every account's usage with reset times, reading it live each time it opens. From there you can start a terminal session or sign in as any account, sync the shared setup, and open the routing log. It runs claude-router itself, so it always agrees with what `launch` will do.
+- `status --json` marks the account the next session will start on with `"next": true`.
+
 ## 0.2.0 - 2026-11-25
 
 Several accounts now work as one.

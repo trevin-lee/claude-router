@@ -78,6 +78,21 @@ claude2  c@example.com (max)  week 100% (resets Nov 30 at 9am)  [read just now]
 
 Add `--cached` to `status` or `suggest` to skip the live read, and `--json` to `status` for scripts.
 
+## Menu bar app (macOS)
+
+Claude Router lives in the menu bar. It shows the account the next session will start on and how much room it has left (`1 · 100%`), and opens to every account's usage, with bars and reset times, laid out like the system's own menu bar menus:
+
+- Every time you open it, it shows the last readings at once and reads every account live (about 15 seconds, no tokens spent). **Refresh Usage** (⌘R) does the same.
+- The account new sessions start on has a blue icon. Click an account for a menu to start a terminal session as it, sign it in (again), or show its config folder.
+- **Sync Shared Setup** runs `claude-router setup`, **Show Routing Log** opens `router.log`, and **Open at Login** starts it with your Mac.
+
+It needs claude-router installed (it looks in Homebrew's and Go's usual places, or set `CLAUDE_ROUTER_BIN`) and macOS 14 or later. Build it from a clone:
+
+```sh
+macos/build-app.sh
+cp -R "macos/build/Claude Router.app" /Applications/
+```
+
 ## How usage is read
 
 Claude Code records each account's usage in that account's `.claude.json`. `launch` reads that record, so it decides instantly: the account with the most room left, a limit whose reset time has passed counting as empty. When the readings are over 30 minutes old, it refreshes them in the background for next time.
@@ -104,6 +119,7 @@ Claude Code records each account's usage in that account's `.claude.json`. `laun
 
 ```sh
 go test ./...
+swift test --package-path macos
 ```
 
 The end-to-end tests build the binary and run it against a fake `claude`, with a temporary `HOME`; they never touch a real account or your `~/.claude`.

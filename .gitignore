@@ -3,3 +3,6 @@
 .env
 dist/
 completions/
+macos/.build/
+macos/build/
+macos/.swiftpm/
